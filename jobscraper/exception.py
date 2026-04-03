@@ -5,11 +5,13 @@ when they encounter unrecoverable errors. Future platform exceptions are
 stubbed out as comments and will be uncommented as scrapers are added.
 """
 
+from __future__ import annotations
+
 
 class IndeedException(Exception):
     """Raised when the Indeed scraper encounters an unrecoverable error."""
 
-    def __init__(self, message=None):
+    def __init__(self, message: str | None = None):
         super().__init__(message or "An error occurred with Indeed")
 
 
