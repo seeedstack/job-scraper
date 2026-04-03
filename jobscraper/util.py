@@ -5,6 +5,7 @@ from __future__ import annotations
 import itertools
 import logging
 import re
+from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
@@ -98,7 +99,7 @@ def plain_converter(html: str | None) -> str | None:
     return " ".join(soup.get_text().split())
 
 
-def remove_attributes(tag) -> None:
+def remove_attributes(tag: Any) -> None:
     """Strip all HTML attributes from a BeautifulSoup tag in-place.
 
     Modifies the tag and all its descendants directly.
@@ -416,7 +417,7 @@ class TLSRotating(RotatingProxySession):
         except ImportError:
             return requests.Session()
 
-    def get(self, url: str, **kwargs):
+    def get(self, url: str, **kwargs) -> Any:
         """Perform a GET request, injecting the next rotating proxy if available."""
         proxy = self._get_proxy_dict()
         if proxy:
