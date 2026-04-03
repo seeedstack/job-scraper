@@ -93,3 +93,118 @@ def test_parse_compensation_salary_snippet() -> None:
     assert comp is not None
     assert comp.min_amount == 50000.0
     assert comp.max_amount == 80000.0
+
+
+# ---------------------------------------------------------------------------
+# IndeedScraper unit tests (mocked HTTP)
+# ---------------------------------------------------------------------------
+
+
+import json
+from unittest.mock import MagicMock, patch
+
+from jobscraper.indeed import IndeedScraper
+from jobscraper.model import ScraperInput, Site
+
+
+def _make_mosaic_html(results: list[dict]) -> str:
+    """Build a minimal HTML page containing a mosaic-data script tag."""
+    payload = {
+        "metaData": {
+            "mosaicProviderJobCardsModel": {
+                "results": results,
+            }
+        }
+    }
+    json_str = json.dumps(payload)
+    script = f'window.mosaic.providerData["mosaic-provider-jobcards"] = {json_str};'
+    return f'<html><script id="mosaic-data">{script}</script></html>'
+
+
+def _make_scraper_input(**kwargs) -> ScraperInput:
+    """Build a minimal ScraperInput for testing."""
+    defaults = dict(
+        site_name=[Site.INDEED],
+        search_term="software engineer",
+        location="Bangalore",
+        results_wanted=2,
+        fetch_full_description=False,
+    )
+    defaults.update(kwargs)
+    return ScraperInput(**defaults)
+
+
+def test_indeed_scraper_returns_jobs() -> None:
+    """IndeedScraper.scrape() returns JobPost objects from mocked HTML."""
+    raw_jobs = [
+        {
+            "jobkey": "key1",
+            "title": "SWE",
+            "company": "Acme",
+            "formattedLocation": "Bangalore, Karnataka",
+        },
+        {
+            "jobkey": "key2",
+            "title": "Backend Dev",
+            "company": "Beta",
+            "formattedLocation": "Mumbai, Maharashtra",
+        },
+    ]
+    html = _make_mosaic_html(raw_jobs)
+
+    mock_response = MagicMock()
+    mock_response.text = html
+
+    with patch("jobscraper.indeed.create_session") as mock_session_factory:
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
+        mock_session_factory.return_value = mock_session
+
+        scraper = IndeedScraper()
+        result = scraper.scrape(_make_scraper_input())
+
+    assert len(result.jobs) == 2
+    assert result.jobs[0].title == "SWE"
+    assert result.jobs[1].title == "Backend Dev"
+    assert result.jobs[0].site == Site.INDEED
+
+
+def test_indeed_scraper_empty_page_stops() -> None:
+    """Scraper stops paginating when Indeed returns no results."""
+    html = _make_mosaic_html([])
+
+    mock_response = MagicMock()
+    mock_response.text = html
+
+    with patch("jobscraper.indeed.create_session") as mock_session_factory:
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
+        mock_session_factory.return_value = mock_session
+
+        scraper = IndeedScraper()
+        result = scraper.scrape(_make_scraper_input())
+
+    assert result.jobs == []
+
+
+def test_indeed_scraper_skips_missing_title() -> None:
+    """Jobs without a title are skipped gracefully."""
+    raw_jobs = [
+        {"jobkey": "key1"},  # no title
+        {"jobkey": "key2", "title": "Engineer"},
+    ]
+    html = _make_mosaic_html(raw_jobs)
+
+    mock_response = MagicMock()
+    mock_response.text = html
+
+    with patch("jobscraper.indeed.create_session") as mock_session_factory:
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
+        mock_session_factory.return_value = mock_session
+
+        scraper = IndeedScraper()
+        result = scraper.scrape(_make_scraper_input())
+
+    assert len(result.jobs) == 1
+    assert result.jobs[0].title == "Engineer"
