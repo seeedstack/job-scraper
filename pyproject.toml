@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "python-job-scraper"
+version = "0.1.0"
+description = "Multi-platform job scraping library"
+authors = ["saran"]
+readme = "README.md"
+packages = [{include = "jobscraper"}]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+requests = "^2.31"
+tls-client = "^1.0"
+pydantic = "^2.0"
+pandas = "^2.0"
+markdownify = "^0.11"
+beautifulsoup4 = "^4.12"
+lxml = "^4.9"
+
+[tool.poetry.group.dev.dependencies]
+black = "*"
+pre-commit = "*"
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ["py313"]
