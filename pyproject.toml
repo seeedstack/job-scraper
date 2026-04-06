@@ -25,6 +25,12 @@ pytest = "*"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: hits live external sites (deselect with -m 'not integration')",
+]
+
 [tool.black]
 line-length = 88
 target-version = ["py313"]

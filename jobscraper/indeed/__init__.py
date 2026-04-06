@@ -79,12 +79,25 @@ class IndeedScraper(Scraper):
                     f"Failed to fetch Indeed search page: {exc}"
                 ) from exc
 
+            status = getattr(response, "status_code", None)
+            if isinstance(status, int) and status >= 400:
+                raise IndeedException(
+                    f"Indeed returned HTTP {status} for search request. "
+                    "Bot detection may be blocking requests."
+                )
+
             html = (
                 response.text
                 if hasattr(response, "text")
                 else response.content.decode()
             )
             job_dicts = parse_mosaic_json(html)
+            if not job_dicts:
+                logger.warning(
+                    "No jobs parsed from Indeed response (start=%d). "
+                    "Page may be a bot-check or the structure may have changed.",
+                    start,
+                )
 
             if not job_dicts:
                 logger.info("No job dicts found on page (start=%d); stopping.", start)

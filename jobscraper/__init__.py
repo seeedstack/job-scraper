@@ -7,6 +7,7 @@ Public API:
 
 from __future__ import annotations
 
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -241,16 +242,32 @@ def _flatten_job(job: Any, enforce_annual_salary: bool) -> dict[str, Any]:
         data["currency"] = job.compensation.currency
         salary_source = "DIRECT_DATA"
     elif job.description:
-        # Fallback: extract salary from description text
-        try:
-            interval_str, min_val, max_val, currency = extract_salary(job.description)
-            data["min_amount"] = min_val
-            data["max_amount"] = max_val
-            data["interval"] = interval_str
-            data["currency"] = currency
-            if min_val is not None:
-                salary_source = "DESCRIPTION"
-        except Exception:
+        # Fallback: extract salary from description text only when salary
+        # keywords or a currency symbol are present, to avoid false positives
+        # like "0–2 years of experience" being parsed as a salary range.
+        _salary_ctx = re.compile(
+            r"\b(salary|pay|stipend|ctc|lpa|lakh|lac|package|compensation"
+            r"|(?:per|a|an)\s+(?:hour|month|year|annum))\b"
+            r"|[$£€₹]",
+            re.IGNORECASE,
+        )
+        if _salary_ctx.search(job.description):
+            try:
+                interval_str, min_val, max_val, currency = extract_salary(
+                    job.description
+                )
+                data["min_amount"] = min_val
+                data["max_amount"] = max_val
+                data["interval"] = interval_str
+                data["currency"] = currency
+                if min_val is not None:
+                    salary_source = "DESCRIPTION"
+            except Exception:
+                data["min_amount"] = None
+                data["max_amount"] = None
+                data["interval"] = None
+                data["currency"] = None
+        else:
             data["min_amount"] = None
             data["max_amount"] = None
             data["interval"] = None
