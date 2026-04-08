@@ -18,9 +18,9 @@ class Site(str, Enum):
     """Supported job platforms."""
 
     INDEED = "indeed"
+    GLASSDOOR = "glassdoor"
+    LINKEDIN = "linkedin"
     # NAUKRI = "naukri"           # planned
-    # GLASSDOOR = "glassdoor"     # planned
-    # LINKEDIN = "linkedin"       # planned
     # FOUNDIT = "foundit"         # planned
     # SHINE = "shine"             # planned
     # INTERNSHALA = "internshala" # planned
@@ -99,6 +99,7 @@ class JobPost(BaseModel):
     job_type: list[JobType] | None = None
     compensation: Compensation | None = None
     is_remote: bool | None = None
+    is_indeed_apply: bool | None = None
     job_level: str | None = None
     description: str | None = None
     emails: list[str] | None = None
@@ -122,6 +123,9 @@ class ScraperInput(BaseModel):
     hours_old: int | None = None
     results_wanted: int = 20
     offset: int = 0
+    job_type: JobType | None = None
+    is_remote: bool = False
+    cookies: dict[str, str] | None = None
     country_indeed: Country = Country.INDIA
     description_format: Literal["markdown", "html"] = "markdown"
     fetch_full_description: bool = True

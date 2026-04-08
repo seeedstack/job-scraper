@@ -15,5 +15,18 @@ class IndeedException(Exception):
         super().__init__(message or "An error occurred with Indeed")
 
 
+class GlassdoorException(Exception):
+    """Raised when the Glassdoor scraper encounters an unrecoverable error."""
+
+    def __init__(self, message: str | None = None):
+        super().__init__(message or "An error occurred with Glassdoor")
+
+
+class LinkedInException(Exception):
+    """Raised when the LinkedIn scraper encounters an unrecoverable error."""
+
+    def __init__(self, message: str | None = None):
+        super().__init__(message or "An error occurred with LinkedIn")
+
+
 # class NaukriException(Exception): pass    # planned
-# class GlassdoorException(Exception): pass # planned

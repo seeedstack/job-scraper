@@ -165,3 +165,41 @@ def test_plain_converter_strips_html():
 def test_plain_converter_none():
     """plain_converter returns None when given None."""
     assert plain_converter(None) is None
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn scraper model tests
+# ---------------------------------------------------------------------------
+
+
+def test_site_linkedin_enum():
+    """Site.LINKEDIN resolves to 'linkedin' string value."""
+    assert Site.LINKEDIN.value == "linkedin"
+
+
+def test_scraper_input_cookies_default():
+    """ScraperInput.cookies defaults to None."""
+    from jobscraper.model import ScraperInput
+
+    si = ScraperInput(site_name=[Site.INDEED], search_term="engineer")
+    assert si.cookies is None
+
+
+def test_scraper_input_cookies_set():
+    """ScraperInput accepts a cookies dict."""
+    from jobscraper.model import ScraperInput
+
+    si = ScraperInput(
+        site_name=[Site.LINKEDIN],
+        search_term="engineer",
+        cookies={"li_at": "ABC123"},
+    )
+    assert si.cookies == {"li_at": "ABC123"}
+
+
+def test_scraper_input_is_remote_default():
+    """ScraperInput.is_remote defaults to False."""
+    from jobscraper.model import ScraperInput
+
+    si = ScraperInput(site_name=[Site.INDEED], search_term="engineer")
+    assert si.is_remote is False
