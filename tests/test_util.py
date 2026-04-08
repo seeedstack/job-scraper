@@ -9,6 +9,7 @@ from jobscraper.model import (
     Country,
     JobPost,
     Location,
+    ScraperInput,
     Site,
 )
 
@@ -179,16 +180,12 @@ def test_site_linkedin_enum():
 
 def test_scraper_input_cookies_default():
     """ScraperInput.cookies defaults to None."""
-    from jobscraper.model import ScraperInput
-
     si = ScraperInput(site_name=[Site.INDEED], search_term="engineer")
     assert si.cookies is None
 
 
 def test_scraper_input_cookies_set():
     """ScraperInput accepts a cookies dict."""
-    from jobscraper.model import ScraperInput
-
     si = ScraperInput(
         site_name=[Site.LINKEDIN],
         search_term="engineer",
@@ -199,7 +196,5 @@ def test_scraper_input_cookies_set():
 
 def test_scraper_input_is_remote_default():
     """ScraperInput.is_remote defaults to False."""
-    from jobscraper.model import ScraperInput
-
     si = ScraperInput(site_name=[Site.INDEED], search_term="engineer")
     assert si.is_remote is False
