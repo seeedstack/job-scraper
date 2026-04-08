@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-02
 **Status:** Approved
-**Scope:** Phase 1 (core) + Phase 2 (Indeed scraper only)
+**Scope:** Phase 1 (core) + Phase 2 (Indeed scraper) + Phase 3 (Glassdoor scraper)
 
 ---
 
@@ -25,19 +25,25 @@ jobscraper/
 ├── model.py           # Pydantic v2 models + Scraper ABC
 ├── util.py            # RequestsRotating, TLSRotating, extract_salary(), logger, html_to_markdown()
 ├── exception.py       # IndeedException (stubs for future sites)
-└── indeed/
-    ├── __init__.py    # IndeedScraper(Scraper)
-    ├── constant.py    # Headers, BASE_URL, JOBS_SEARCH_URL, JOB_TYPE_MAP
-    └── util.py        # parse_mosaic_json(), parse_compensation(), parse_location(), extract_emails()
+├── indeed/
+│   ├── __init__.py    # IndeedScraper(Scraper)
+│   ├── constant.py    # Headers, BASE_URL, JOBS_SEARCH_URL, JOB_TYPE_MAP
+│   └── util.py        # parse_mosaic_json(), parse_compensation(), parse_location(), extract_emails()
+└── glassdoor/
+    ├── __init__.py    # GlassdoorScraper(Scraper)
+    ├── constant.py    # Headers, BASE_URL, GRAPHQL_URL, JOB_TYPE_MAP
+    └── util.py        # parse_jobs(), parse_compensation(), parse_location()
 
 examples/
-└── test_indeed.py
+├── test_indeed.py
+└── test_glassdoor.py
 
 tests/
 ├── __init__.py
 ├── test_scrape_jobs.py
 ├── test_util.py
-└── test_indeed.py
+├── test_indeed.py
+└── test_glassdoor.py
 
 pyproject.toml
 .pre-commit-config.yaml
@@ -70,8 +76,8 @@ pytest tests/
 ```python
 class Site(str, Enum):
     INDEED = "indeed"
+    GLASSDOOR = "glassdoor"
     # NAUKRI = "naukri"           # planned
-    # GLASSDOOR = "glassdoor"     # planned
     # LINKEDIN = "linkedin"       # planned
     # FOUNDIT = "foundit"         # planned
     # SHINE = "shine"             # planned
@@ -187,8 +193,11 @@ class IndeedException(Exception):
     def __init__(self, message=None):
         super().__init__(message or "An error occurred with Indeed")
 
+class GlassdoorException(Exception):
+    def __init__(self, message=None):
+        super().__init__(message or "An error occurred with Glassdoor")
+
 # class NaukriException(Exception): pass    # planned
-# class GlassdoorException(Exception): pass # planned
 ```
 
 ---
@@ -318,6 +327,106 @@ print(jobs.head(3).to_string())
 ```
 
 **Success criteria:** Non-empty DataFrame with at minimum: `title`, `company`, `location`, `job_url`, `date_posted`, `job_type`, `min_amount`, `max_amount`, `description`.
+
+---
+
+## Glassdoor Scraper (`glassdoor/`)
+
+### Data Flow
+
+1. `GlassdoorScraper.scrape()` hits `www.glassdoor.co.in` homepage via `TLSRotating` to acquire session cookies + CSRF token
+2. POSTs to `https://www.glassdoor.co.in/graph` with a GraphQL `JobSearchResultsQuery`
+3. Parses JSON response → list of job dicts
+4. Each dict → `JobPost` via field-level `try/except`
+5. If `fetch_full_description=True`: fetch job detail page, extract description div, convert to markdown/html
+6. Paginate via `pageNumber` cursor until `results_wanted` reached or empty page returned; `time.sleep(0.5–2.5)` between pages
+7. Return `JobResponse(jobs=[...])`
+
+### `glassdoor/constant.py`
+- `GLASSDOOR_HEADERS` — Chrome 120 UA, `Apollo-Requires-Preflight: true`, `Content-Type: application/json`, Referer
+- `BASE_URL = "https://www.glassdoor.co.in"`
+- `GRAPHQL_URL = BASE_URL + "/graph"`
+- `JOB_TYPE_MAP` — maps Glassdoor raw strings (`fulltime`, `parttime`, `contract`, `internship`) → `JobType` enum
+
+### `glassdoor/util.py`
+- `get_csrf_token(session, headers) -> str` — fetches homepage, extracts `GDCSRF` cookie value
+- `build_job_search_payload(search_term, location, page, job_type, results_per_page) -> dict` — constructs GraphQL POST body for `JobSearchResultsQuery`
+- `parse_jobs(data: dict) -> list[dict]` — navigates `data.jobListings.jobListings` → list of raw job dicts
+- `parse_compensation(job: dict) -> Compensation | None` — reads `payPeriod`, `minPayRange`, `maxPayRange`
+- `parse_location(job: dict) -> Location` — reads `location.cityName`, `location.stateName`
+- `get_job_detail_url(listing_id: str) -> str` — builds `BASE_URL + /job-listing/jl={listing_id}`
+
+### `glassdoor/__init__.py` — `GlassdoorScraper(Scraper)`
+
+```
+scrape(scraper_input) -> JobResponse:
+1. Create TLSRotating session; warm up by fetching BASE_URL
+2. get_csrf_token() → inject as gd-csrf-token header
+3. Loop:
+   a. build_job_search_payload(page=current_page)
+   b. POST to GRAPHQL_URL with JSON body
+   c. parse_jobs() → list of raw dicts
+   d. Each dict → JobPost (field-level try/except)
+   e. If fetch_full_description: GET detail URL, extract description
+   f. Break if empty page or results_wanted reached
+   g. current_page += 1; sleep 0.5–2.5s
+4. Return JobResponse(jobs=[...])
+```
+
+**Anti-bot strategy:**
+- `TLSRotating` chrome_120 + homepage warm-up for cookies
+- `Apollo-Requires-Preflight: true` + CSRF token header on every POST
+- Randomized `time.sleep(0.5–2.5)` between pages
+- Rotate proxies if provided
+
+### GraphQL Query (JobSearchResultsQuery)
+
+```graphql
+query JobSearchResultsQuery($keyword: String, $locationId: Int, $locationType: String,
+                             $numJobsToShow: Int, $pageNumber: Int, $jobType: JobTypeFilter) {
+  jobListings(contextHolder: {
+    searchParams: {
+      keyword: $keyword
+      locationId: $locationId
+      locationType: $locationType
+      numPerPage: $numJobsToShow
+      pageNumber: $pageNumber
+      jobType: $jobType
+      filterParams: []
+      originalPageUrl: "https://www.glassdoor.co.in/Job/jobs.htm"
+    }
+  }) {
+    jobListings {
+      jobview {
+        header {
+          jobLink
+          jobTitleText
+          employerNameFromSearch
+          locationName
+          divisionEmployerName
+          indeedJobAttribute { indeedApplyMetadata }
+          payPeriod
+          payPeriodAdjustedPay { p10 p90 }
+          easyApply
+        }
+        job {
+          listingId
+          description
+          jobTypes
+          pubDate
+          isRemoteOrHybrid
+        }
+        overview {
+          squareLogoUrl
+          primaryIndustry { industryId }
+        }
+      }
+    }
+    totalJobsCount
+    paginationCursors { cursor pageNumber }
+  }
+}
+```
 
 ---
 

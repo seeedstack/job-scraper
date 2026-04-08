@@ -17,7 +17,7 @@ from jobscraper.indeed.util import (
     parse_mosaic_json,
 )
 from jobscraper.model import JobPost, JobResponse, Scraper, ScraperInput, Site
-from jobscraper.util import create_logger, create_session, markdown_converter
+from jobscraper.util import create_logger, create_session, get_company_website, markdown_converter
 
 logger = create_logger("indeed")
 
@@ -193,7 +193,7 @@ class IndeedScraper(Scraper):
             # Job type
             try:
                 raw_type = raw.get("jobTypes") or []
-                job_type = None
+                job_type = [JOB_TYPE_MAP["fulltime"]]
                 if isinstance(raw_type, list) and raw_type:
                     job_type = [
                         JOB_TYPE_MAP[t.lower()]
@@ -217,10 +217,27 @@ class IndeedScraper(Scraper):
             except Exception:
                 is_remote = None
 
+            # Indeed Apply vs external apply
+            # indeedApplyEnabled=True means apply happens on Indeed itself.
+            # thirdPartyApplyUrl is the external ATS link when present.
+            try:
+                indeed_apply_flag = raw.get("indeedApplyEnabled")
+                third_party_url = raw.get("thirdPartyApplyUrl") or None
+                if indeed_apply_flag is not None:
+                    is_indeed_apply: bool | None = bool(indeed_apply_flag)
+                elif third_party_url:
+                    is_indeed_apply = False
+                else:
+                    is_indeed_apply = None
+            except Exception:
+                is_indeed_apply = None
+                third_party_url = None
+
             # Description & emails
             description: str | None = None
             emails: list[str] | None = None
-            job_url_direct: str | None = None
+            # Seed job_url_direct from mosaic data if available
+            job_url_direct: str | None = third_party_url if not is_indeed_apply else None
 
             if scraper_input.fetch_full_description:
                 try:
@@ -253,9 +270,33 @@ class IndeedScraper(Scraper):
                         "Job %s: failed to fetch detail page: %s", job_key, exc
                     )
 
-            # Company URL / logo
+            # Company URL / logo + scrape emails from company site
             try:
-                company_url = raw.get("companyOverviewLink") or None
+                raw_company_url = raw.get("companyOverviewLink") or ""
+                if raw_company_url.startswith("https"):
+                    company_url = raw_company_url
+                elif company:
+                    company_url = get_company_website(company)
+                else:
+                    company_url = None
+
+                if company_url:
+                    try:
+                        co_resp = session.get(company_url, headers=headers)
+                        co_html = (
+                            co_resp.text
+                            if hasattr(co_resp, "text")
+                            else co_resp.content.decode()
+                        )
+                        co_emails = extract_emails(co_html) or []
+                        if co_emails:
+                            existing = set(emails or [])
+                            emails = list(existing | set(co_emails)) or None
+                    except Exception as exc:
+                        logger.warning(
+                            "Job %s: failed to scrape emails from company site %s: %s",
+                            job_key, company_url, exc,
+                        )
             except Exception:
                 company_url = None
 
@@ -278,6 +319,7 @@ class IndeedScraper(Scraper):
                 job_type=job_type,
                 compensation=compensation,
                 is_remote=is_remote,
+                is_indeed_apply=is_indeed_apply,
                 description=description,
                 emails=emails,
                 company_url=company_url,
