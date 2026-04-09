@@ -33,10 +33,14 @@ from jobscraper.util import (
 # Scraper registry
 # ---------------------------------------------------------------------------
 
+from jobscraper.glassdoor import GlassdoorScraper  # noqa: E402
 from jobscraper.indeed import IndeedScraper  # noqa: E402
+from jobscraper.linkedin import LinkedInScraper  # noqa: E402
 
 SCRAPER_MAPPING: dict[Site, type] = {
     Site.INDEED: IndeedScraper,
+    Site.GLASSDOOR: GlassdoorScraper,
+    Site.LINKEDIN: LinkedInScraper,
 }
 
 
@@ -62,6 +66,7 @@ def scrape_jobs(
     enforce_annual_salary: bool = False,
     verbose: int = 0,
     user_agent: str | None = None,
+    cookies: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Scrape job listings from one or more platforms and return a DataFrame.
 
@@ -88,6 +93,8 @@ def scrape_jobs(
             annual equivalents before returning.
         verbose: Logging verbosity. 0=ERROR, 1=WARNING, 2=INFO.
         user_agent: Override the default User-Agent header for Indeed.
+        cookies: Optional cookies dict to pass to scrapers (e.g. for
+            LinkedIn authentication).
 
     Returns:
         A pandas DataFrame with one row per job posting. Columns follow
@@ -132,6 +139,9 @@ def scrape_jobs(
         hours_old=hours_old,
         results_wanted=results_wanted,
         offset=offset or 0,
+        job_type=job_type_enum,
+        is_remote=is_remote,
+        cookies=cookies,
         country_indeed=country,
         description_format=description_format,  # type: ignore[arg-type]
         fetch_full_description=True,
@@ -221,6 +231,7 @@ def _flatten_job(job: Any, enforce_annual_salary: bool) -> dict[str, Any]:
         "location": job.location.display_location() if job.location else None,
         "date_posted": job.date_posted,
         "is_remote": job.is_remote,
+        "is_indeed_apply": job.is_indeed_apply,
         "job_level": job.job_level,
         "company_url": job.company_url,
         "company_logo": job.company_logo,
