@@ -29,14 +29,20 @@ jobscraper/
 │   ├── __init__.py    # IndeedScraper(Scraper)
 │   ├── constant.py    # Headers, BASE_URL, JOBS_SEARCH_URL, JOB_TYPE_MAP
 │   └── util.py        # parse_mosaic_json(), parse_compensation(), parse_location(), extract_emails()
-└── glassdoor/
-    ├── __init__.py    # GlassdoorScraper(Scraper)
-    ├── constant.py    # Headers, BASE_URL, GRAPHQL_URL, JOB_TYPE_MAP
-    └── util.py        # parse_jobs(), parse_compensation(), parse_location()
+├── glassdoor/
+│   ├── __init__.py    # GlassdoorScraper(Scraper)
+│   ├── constant.py    # Headers, BASE_URL, GRAPHQL_URL, JOB_TYPE_MAP
+│   └── util.py        # parse_jobs(), parse_compensation(), parse_location()
+└── linkedin/
+    ├── __init__.py    # LinkedInScraper(Scraper)
+    ├── _scraper.py    # LinkedInScraper implementation
+    ├── constant.py    # Headers, URLs, JOB_TYPE_MAP, JOB_TYPE_FILTER
+    └── util.py        # parse_search_html(), parse_voyager_job(), parse_location(), etc.
 
 examples/
 ├── test_indeed.py
-└── test_glassdoor.py
+├── test_glassdoor.py
+└── test_linkedin.py
 
 tests/
 ├── __init__.py
@@ -427,6 +433,70 @@ query JobSearchResultsQuery($keyword: String, $locationId: Int, $locationType: S
   }
 }
 ```
+
+---
+
+## LinkedIn Scraper (`linkedin/`)
+
+### Data Flow
+
+1. `LinkedInScraper.scrape()` warms up by fetching `www.linkedin.com` to acquire `JSESSIONID` cookie
+2. If `li_at` provided in `cookies`: injects `Cookie` and `Csrf-Token` headers for both search and Voyager calls
+3. GETs `/jobs/search/?keywords=X&location=Y&start=N&f_JT=F&f_TPR=r86400` — public HTML, no auth required
+4. `parse_search_html()` → list of job card dicts (id, title, company, location, date, job_url)
+5. Per job — two paths:
+   - **Voyager (authenticated):** `GET /voyager/api/jobs/jobPostings/{id}?decorationId=...` → `parse_voyager_job()` for description, salary, job type, company details, apply URL
+   - **HTML fallback:** `GET /jobs/view/{id}/` → `parse_html_detail()` for description and direct apply URL
+6. Paginate via `start` += 25 until `results_wanted` reached or empty page; `time.sleep(0.5–2.5)` between pages
+7. Return `JobResponse(jobs=[...])`
+
+### `linkedin/constant.py`
+- `LINKEDIN_HEADERS` — Chrome 120 UA, Accept, Accept-Language, Referer
+- `VOYAGER_HEADERS` — `X-RestLi-Protocol-Version: 2.0.0`, `X-Li-Track`, Accept: `application/vnd.linkedin.normalized+json+2.1`
+- `BASE_URL = "https://www.linkedin.com"`
+- `JOB_DETAIL_URL = BASE_URL + "/jobs/view/{job_id}/"`
+- `VOYAGER_JOB_URL = BASE_URL + "/voyager/api/jobs/jobPostings/{job_id}"`
+- `VOYAGER_DECORATION` — decoration ID string for full job posting
+- `JOB_TYPE_MAP` — maps LinkedIn `employmentStatus` strings → `JobType` enum
+- `JOB_TYPE_FILTER` — maps `JobType.value` → LinkedIn URL filter code (`F`, `P`, `C`, `T`, `I`)
+- `PAGE_SIZE = 25`
+
+### `linkedin/util.py`
+- `parse_search_html(html)` → list of raw job card dicts
+- `parse_location(raw)` → Location (handles city/state/country, "Remote in" prefix)
+- `build_search_params(scraper_input, start)` → dict (keywords, location, f_JT, f_TPR, f_WT, distance, start)
+- `parse_voyager_job(data)` → dict with: title, description_html, employment_status, is_remote, listed_at, formatted_location, job_url_direct, is_easy_apply, company, company_url, company_logo, salary
+- `parse_compensation(salary_dict)` → Compensation | None
+- `parse_html_detail(html, description_format)` → (description, job_url_direct, emails)
+- `parse_date(date_str)` → date | None
+
+### `linkedin/__init__.py` — `LinkedInScraper(Scraper)`
+
+```
+scrape(scraper_input) -> JobResponse:
+1. Create TLSRotating session; warmup GET linkedin.com → extract JSESSIONID
+2. If li_at in cookies: inject Cookie + Csrf-Token headers for search + Voyager
+3. Loop:
+   a. GET /jobs/search/ with params (keywords, location, f_JT, f_TPR, f_WT, start)
+   b. parse_search_html() → list of job card dicts
+   c. For each card:
+      - If li_at: GET Voyager detail → parse_voyager_job() (description, salary, type, company)
+      - Else (or Voyager fails): GET HTML detail → parse_html_detail()
+      - Build JobPost from merged data
+   d. Break if empty page or results_wanted reached
+   e. start += 25; sleep 0.5–2.5s
+4. Return JobResponse(jobs=[...])
+```
+
+**Anti-bot strategy:**
+- `TLSRotating` chrome_120 + homepage warmup for cookies
+- JSESSIONID as `Csrf-Token` header on every Voyager request
+- Randomized `time.sleep(0.5–2.5)` between pages
+- Rotate proxies if provided
+
+### `scrape_jobs()` additions
+- `is_remote: bool = False` — when True, adds `f_WT=2` to LinkedIn search params
+- `cookies: dict[str, str] | None = None` — pass `{"li_at": "your_cookie_value"}` for Voyager access
 
 ---
 

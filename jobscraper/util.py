@@ -33,6 +33,7 @@ desired_order: list[str] = [
     "max_amount",
     "currency",
     "is_remote",
+    "is_indeed_apply",
     "job_level",
     "company_url",
     "company_logo",
@@ -424,6 +425,13 @@ class TLSRotating(RotatingProxySession):
             kwargs.setdefault("proxy", proxy.get("https"))
         return self._session.get(url, **kwargs)
 
+    def post(self, url: str, **kwargs) -> Any:
+        """Perform a POST request, injecting the next rotating proxy if available."""
+        proxy = self._get_proxy_dict()
+        if proxy:
+            kwargs.setdefault("proxy", proxy.get("https"))
+        return self._session.post(url, **kwargs)
+
 
 def create_session(
     proxies: list[str] | str | None = None,
@@ -448,3 +456,45 @@ def create_session(
     return RequestsRotating(
         proxies=proxies, ca_cert=ca_cert, clear_cookies=clear_cookies
     )
+
+
+_SKIP_DOMAINS: frozenset[str] = frozenset(
+    [
+        "indeed.com",
+        "linkedin.com",
+        "glassdoor.com",
+        "facebook.com",
+        "twitter.com",
+        "youtube.com",
+        "wikipedia.org",
+        "instagram.com",
+    ]
+)
+
+
+def get_company_website(company_name: str) -> str | None:
+    """Return the official website for a company using DuckDuckGo search.
+
+    Searches for ``{company_name} official site``, iterates the first 5
+    results, and returns the first URL that does not belong to a known
+    aggregator or social domain. Returns None if nothing clean is found or
+    if the search raises an exception.
+
+    Args:
+        company_name: Name of the company to look up.
+
+    Returns:
+        URL string of the company's website, or None.
+    """
+    from ddgs import DDGS  # type: ignore[import]
+
+    query = f"{company_name} official indian career site"
+    try:
+        results = DDGS().text(query, max_results=5)
+        for result in results:
+            url = result.get("href", "")
+            if url and not any(domain in url for domain in _SKIP_DOMAINS):
+                return url
+    except Exception:
+        pass
+    return None
