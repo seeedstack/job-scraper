@@ -170,3 +170,180 @@ def test_build_search_params_offset():
     """start offset passed through."""
     params = build_search_params(_make_input(), start=50)
     assert params["start"] == 50
+
+
+# ---------------------------------------------------------------------------
+# parse_voyager_job
+# ---------------------------------------------------------------------------
+
+from jobscraper.linkedin.util import (
+    parse_compensation,
+    parse_html_detail,
+    parse_voyager_job,
+)
+from jobscraper.model import CompensationInterval
+
+
+VOYAGER_RESPONSE = {
+    "title": "Backend Engineer",
+    "description": {"text": "<p>We are hiring.</p>"},
+    "employmentStatus": "FULL_TIME",
+    "workplaceTypes": ["REMOTE"],
+    "listedAt": 1743984000000,
+    "formattedLocation": "Bengaluru, Karnataka, India",
+    "applyMethod": {
+        "com.linkedin.voyager.jobs.OffsiteApply": {
+            "websiteUrl": "https://careers.example.com/apply/123"
+        }
+    },
+    "companyDetails": {
+        "com.linkedin.voyager.deco.jobs.web.shared.WebJobPostingCompany": {
+            "companyResolutionResult": {
+                "name": "Example Corp",
+                "url": "https://www.linkedin.com/company/example-corp",
+                "logo": {
+                    "com.linkedin.common.VectorImage": {
+                        "rootUrl": "https://media.licdn.com/logo.png"
+                    }
+                },
+            }
+        }
+    },
+    "salary": {
+        "salaryInsight": {
+            "baseSalary": {
+                "unitOfWork": "YEAR",
+                "minValue": {"value": 1500000},
+                "maxValue": {"value": 2500000},
+                "currencyCode": "INR",
+            }
+        }
+    },
+}
+
+
+def test_parse_voyager_job_title():
+    parsed = parse_voyager_job(VOYAGER_RESPONSE)
+    assert parsed["title"] == "Backend Engineer"
+
+
+def test_parse_voyager_job_description():
+    parsed = parse_voyager_job(VOYAGER_RESPONSE)
+    assert "<p>We are hiring.</p>" in (parsed["description_html"] or "")
+
+
+def test_parse_voyager_job_employment_status():
+    parsed = parse_voyager_job(VOYAGER_RESPONSE)
+    assert parsed["employment_status"] == "full-time"
+
+
+def test_parse_voyager_job_is_remote():
+    parsed = parse_voyager_job(VOYAGER_RESPONSE)
+    assert parsed["is_remote"] is True
+
+
+def test_parse_voyager_job_offsite_apply():
+    parsed = parse_voyager_job(VOYAGER_RESPONSE)
+    assert parsed["job_url_direct"] == "https://careers.example.com/apply/123"
+    assert parsed["is_easy_apply"] is False
+
+
+def test_parse_voyager_job_company():
+    parsed = parse_voyager_job(VOYAGER_RESPONSE)
+    assert parsed["company"] == "Example Corp"
+    assert parsed["company_url"] == "https://www.linkedin.com/company/example-corp"
+    assert "logo.png" in (parsed["company_logo"] or "")
+
+
+def test_parse_voyager_job_salary():
+    parsed = parse_voyager_job(VOYAGER_RESPONSE)
+    s = parsed["salary"]
+    assert s["min"] == 1500000
+    assert s["max"] == 2500000
+    assert s["currency"] == "INR"
+    assert s["unit"] == "YEAR"
+
+
+def test_parse_voyager_job_easy_apply():
+    data = {**VOYAGER_RESPONSE, "applyMethod": {
+        "com.linkedin.voyager.jobs.ComplexOnsiteApply": {}
+    }}
+    parsed = parse_voyager_job(data)
+    assert parsed["is_easy_apply"] is True
+    assert parsed["job_url_direct"] is None
+
+
+def test_parse_voyager_job_missing_salary():
+    data = {k: v for k, v in VOYAGER_RESPONSE.items() if k != "salary"}
+    parsed = parse_voyager_job(data)
+    assert parsed["salary"] is None
+
+
+def test_parse_compensation_yearly():
+    comp = parse_compensation({"min": 1200000, "max": 2000000, "currency": "INR", "unit": "YEAR"})
+    assert comp is not None
+    assert comp.interval == CompensationInterval.YEARLY
+    assert comp.min_amount == 1200000.0
+    assert comp.max_amount == 2000000.0
+    assert comp.currency == "INR"
+
+
+def test_parse_compensation_hourly():
+    comp = parse_compensation({"min": 500, "max": 1000, "currency": "INR", "unit": "HOUR"})
+    assert comp is not None
+    assert comp.interval == CompensationInterval.HOURLY
+
+
+def test_parse_compensation_none():
+    assert parse_compensation(None) is None
+
+
+def test_parse_compensation_empty():
+    assert parse_compensation({}) is None
+
+
+DETAIL_HTML_EXTERNAL = """
+<html><body>
+  <div class="show-more-less-html__markup">
+    <p>We are a fast-growing startup. Contact jobs@example.com to apply.</p>
+  </div>
+  <a class="apply-button apply-button--link"
+     href="https://careers.example.com/apply/999">Apply</a>
+</body></html>
+"""
+
+DETAIL_HTML_EASY_APPLY = """
+<html><body>
+  <div class="show-more-less-html__markup">
+    <p>Great opportunity at our company.</p>
+  </div>
+  <button class="jobs-apply-button">Easy Apply</button>
+</body></html>
+"""
+
+
+def test_parse_html_detail_description():
+    desc, _, _ = parse_html_detail(DETAIL_HTML_EXTERNAL, "markdown")
+    assert desc is not None
+    assert "fast-growing" in desc
+
+
+def test_parse_html_detail_external_url():
+    _, job_url_direct, _ = parse_html_detail(DETAIL_HTML_EXTERNAL, "markdown")
+    assert job_url_direct == "https://careers.example.com/apply/999"
+
+
+def test_parse_html_detail_easy_apply_no_url():
+    _, job_url_direct, _ = parse_html_detail(DETAIL_HTML_EASY_APPLY, "markdown")
+    assert job_url_direct is None
+
+
+def test_parse_html_detail_emails():
+    _, _, emails = parse_html_detail(DETAIL_HTML_EXTERNAL, "markdown")
+    assert emails is not None
+    assert "jobs@example.com" in emails
+
+
+def test_parse_html_detail_html_format():
+    desc, _, _ = parse_html_detail(DETAIL_HTML_EXTERNAL, "html")
+    assert "<p>" in (desc or "")
