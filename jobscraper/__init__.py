@@ -72,7 +72,7 @@ def scrape_jobs(
 
     Args:
         site_name: Platform(s) to scrape. Accepts a string, Site enum, or
-            a mixed list of both. Currently supports "indeed".
+            a mixed list of both. Supports "indeed", "glassdoor", "linkedin".
         search_term: Job title or keyword to search for.
         location: City or region to filter jobs by.
         distance: Search radius in km (default 50). Passed as-is to Indeed's
