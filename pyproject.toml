@@ -1,37 +1,100 @@
-[tool.poetry]
+[project]
 name = "python-job-scraper"
 version = "0.3.0"
-description = "Multi-platform job scraping library"
-authors = ["saran"]
+description = "Multi-platform job scraping library supporting Indeed, LinkedIn, Glassdoor, Upwork, and Internshala."
+authors = [{name = "sarankirthic", email = "sarankirthic@gmail.com"}]
+license = "MIT"
 readme = "README.md"
-packages = [{include = "jobscraper"}]
+requires-python = ">=3.13"
+keywords = ["job-scraping", "indeed", "linkedin", "glassdoor", "upwork", "internshala", "web-scraping"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Office/Business",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "requests>=2.31",
+    "tls-client>=1.0",
+    "pydantic>=2.0",
+    "pandas>=2.0",
+    "markdownify>=0.11",
+    "beautifulsoup4>=4.12",
+    "lxml>=4.9",
+    "ddgs",
+]
 
-[tool.poetry.dependencies]
-python = "^3.13"
-requests = "^2.31"
-tls-client = "^1.0"
-pydantic = "^2.0"
-pandas = "^2.0"
-markdownify = "^0.11"
-beautifulsoup4 = "^4.12"
-lxml = "^4.9"
-ddgs = "*"
-
-[tool.poetry.group.dev.dependencies]
-black = "*"
-pre-commit = "*"
-pytest = "*"
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
+lint = [
+    "black>=24.1.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "pre-commit>=3.5.0",
+]
+dev = [
+    "black>=24.1.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "pre-commit>=3.5.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["jobscraper*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+minversion = "7.0"
+addopts = "--cov=jobscraper --cov-report=term-missing --cov-report=html -v"
 markers = [
     "integration: hits live external sites (deselect with -m 'not integration')",
+    "slow: slow tests",
+    "unit: unit tests",
 ]
+
+[tool.coverage.run]
+branch = true
+omit = ["*/tests/*", "*/__main__.py"]
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "def __repr__", "raise AssertionError", "raise NotImplementedError"]
 
 [tool.black]
 line-length = 88
-target-version = ["py313"]
+target-version = ["py313", "py314"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+select = ["E", "W", "F", "I"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[project.urls]
+Homepage = "https://github.com/seeedstack/job-scraper"
+Documentation = "https://github.com/seeedstack/job-scraper/blob/main/README.md"
+Repository = "https://github.com/seeedstack/job-scraper.git"
+Issues = "https://github.com/seeedstack/job-scraper/issues"
+Changelog = "https://github.com/seeedstack/job-scraper/releases"
