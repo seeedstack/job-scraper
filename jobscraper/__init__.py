@@ -36,11 +36,19 @@ from jobscraper.util import (
 from jobscraper.glassdoor import GlassdoorScraper  # noqa: E402
 from jobscraper.indeed import IndeedScraper  # noqa: E402
 from jobscraper.linkedin import LinkedInScraper  # noqa: E402
+from jobscraper.upwork import UpworkScraper  # noqa: E402
+from jobscraper.internshala import (  # noqa: E402
+    InternshalaInternshipsScraper,
+    InternshalaJobsScraper,
+)
 
 SCRAPER_MAPPING: dict[Site, type] = {
     Site.INDEED: IndeedScraper,
     Site.GLASSDOOR: GlassdoorScraper,
     Site.LINKEDIN: LinkedInScraper,
+    Site.UPWORK: UpworkScraper,
+    Site.INTERNSHALA_JOBS: InternshalaJobsScraper,
+    Site.INTERNSHALA_INTERNSHIPS: InternshalaInternshipsScraper,
 }
 
 
