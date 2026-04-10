@@ -35,4 +35,6 @@ BOT_CHECK_SIGNATURES: list[str] = [
     "cf-browser-verification",
     "challenge-form",
     "captcha",
+    "<title>Challenge - Upwork</title>",
+    "challenge-running",
 ]

@@ -80,6 +80,26 @@ def parse_compensation(raw: str | None) -> Compensation | None:
             currency="INR",
         )
 
+    # Raw rupee range with /year: '₹ 6,00,000 - 6,50,000 /year'
+    rupee_year = re.search(
+        r"[\u20b9₹]\s*([\d,]+)\s*-\s*([\d,]+)\s*/\s*year", raw, re.IGNORECASE
+    )
+    if rupee_year:
+        return Compensation(
+            interval=CompensationInterval.YEARLY,
+            min_amount=float(rupee_year.group(1).replace(",", "")),
+            max_amount=float(rupee_year.group(2).replace(",", "")),
+            currency="INR",
+        )
+
+    # Raw rupee range without interval (assume yearly if values > 1,00,000): '₹ 6,00,000 - 6,50,000'
+    rupee_range = re.search(r"[\u20b9₹]\s*([\d,]+)\s*-\s*([\d,]+)", raw)
+    if rupee_range:
+        mn = float(rupee_range.group(1).replace(",", ""))
+        mx = float(rupee_range.group(2).replace(",", ""))
+        interval = CompensationInterval.YEARLY if mn >= 100_000 else CompensationInterval.MONTHLY
+        return Compensation(interval=interval, min_amount=mn, max_amount=mx, currency="INR")
+
     # Monthly: '₹ 15,000 /month'
     monthly = re.search(r"[\u20b9₹]?\s*([\d,]+)\s*/\s*month", raw, re.IGNORECASE)
     if monthly:
@@ -126,48 +146,48 @@ def parse_listing_html(
 
     for card in cards:
         try:
-            # ID + URL from profile link href
-            profile_div = card.find("div", class_="profile")
-            anchor = profile_div.find("a") if profile_div else None
-            href = anchor.get("href", "") if anchor else ""
-            title = anchor.get_text(strip=True) if anchor else None
+            # ID + URL from card-level attributes
+            job_id = card.get("internshipid") or ""
+            href = card.get("data-href") or ""
+            job_url = "https://internshala.com" + href if href.startswith("/") else href
 
-            # Extract numeric ID from href: /job/detail/123456/slug or /internship/detail/789/slug
-            id_match = re.search(r"/detail/(\d+)/", href)
-            job_id = id_match.group(1) if id_match else href
-
-            base = "https://internshala.com"
-            job_url = base + href if href.startswith("/") else href
+            # Title from anchor with job-title-href class
+            title_a = card.find("a", class_="job-title-href")
+            title = title_a.get_text(strip=True) if title_a else None
 
             # Company
-            company_div = card.find("div", class_="company_name")
-            company_anchor = company_div.find("a") if company_div else None
-            company = company_anchor.get_text(strip=True) if company_anchor else None
+            comp_p = card.find("p", class_="company-name")
+            company = comp_p.get_text(strip=True) if comp_p else None
 
-            # Location
-            loc_div = card.find("div", class_="location_link")
-            loc_anchor = loc_div.find("a", class_="location_names") if loc_div else None
-            location_raw = loc_anchor.get_text(strip=True) if loc_anchor else None
+            # Location — element with class "locations" (div or p)
+            loc_el = card.find(class_="locations")
+            if loc_el:
+                loc_inner = loc_el.find("a") or loc_el.find("span")
+                location_raw = loc_inner.get_text(strip=True) if loc_inner else loc_el.get_text(strip=True)
+            else:
+                location_raw = None
 
             # Salary / stipend
-            sal_div = card.find("div", class_="salary-stipend")
-            salary_raw = sal_div.get_text(strip=True) if sal_div else None
+            if mode == "internships":
+                # Internships use a span.stipend element
+                stipend_span = card.find("span", class_="stipend")
+                salary_raw = stipend_span.get_text(strip=True) if stipend_span else None
+            else:
+                # Jobs: mobile span includes the /year interval label
+                mobile_span = card.find("span", class_="mobile")
+                salary_raw = mobile_span.get_text(strip=True) if mobile_span else None
 
-            # Job type
-            type_div = card.find("div", class_="job-internship-type")
-            type_span = type_div.find("span") if type_div else None
-            job_type_raw = type_span.get_text(strip=True) if type_span else None
-
-            # Duration — internships only
+            # Duration — internships only: 3rd row-1-item (location, stipend, duration)
             duration: str | None = None
             if mode == "internships":
-                details_container = card.find("div", class_="internship_other_details_container")
-                if details_container:
-                    for item in details_container.find_all("div", class_="other_detail_item"):
-                        detail_type = item.find("span", class_="detail_type")
-                        detail_val = item.find("span", class_="detail_value")
-                        if detail_type and "duration" in detail_type.get_text(strip=True).lower():
-                            duration = detail_val.get_text(strip=True) if detail_val else None
+                row1_items = card.find_all("div", class_="row-1-item")
+                if len(row1_items) >= 3:
+                    dur_span = row1_items[2].find("span")
+                    duration = dur_span.get_text(strip=True) if dur_span else None
+
+            # Employment type from card attribute ('job' → 'Job', 'internship' → 'Internship')
+            emp_type = card.get("employment_type") or ""
+            job_type_raw = emp_type.capitalize() if emp_type else None
 
             results.append({
                 "id": job_id,

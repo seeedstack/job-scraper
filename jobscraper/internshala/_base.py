@@ -29,6 +29,7 @@ class InternshalaScraper(Scraper):
     _endpoint: str
     _mode: Literal["jobs", "internships"]
     _site: Site
+    _search_suffix: str  # appended to slug: 'jobs' or 'internship'
 
     def scrape(self, scraper_input: ScraperInput) -> JobResponse:
         """Paginate Internshala listings and return a JobResponse.
@@ -42,10 +43,11 @@ class InternshalaScraper(Scraper):
         Raises:
             InternshalaException: After 3 failed retries on 429/403.
         """
+        # Internshala redirects TLS fingerprinted sessions — use plain requests
         session = create_session(
             proxies=scraper_input.proxies,
             ca_cert=scraper_input.ca_cert,
-            is_tls=True,
+            is_tls=False,
         )
         headers = dict(INTERNSHALA_HEADERS)
         if scraper_input.user_agent:
@@ -60,19 +62,16 @@ class InternshalaScraper(Scraper):
         jobs: list[JobPost] = []
         page = 1
 
+        # Build path-based search URL: /jobs/python-developer-jobs/ or /internships/machine-learning-internship
+        search_url = self._build_search_url(scraper_input.search_term)
+
         while len(jobs) < scraper_input.results_wanted:
-            params: dict[str, Any] = {"page": page}
-            if scraper_input.search_term:
-                params["search_title"] = scraper_input.search_term
-            if scraper_input.location:
-                params["location"] = scraper_input.location
+            params: dict[str, Any] = {}
+            if page > 1:
+                params["page"] = page
 
-            resp = self._get_with_retry(session, self._endpoint, headers, params)
+            resp = self._get_with_retry(session, search_url, headers, params or None)
             if resp is None:
-                break
-
-            if resp.status_code in (301, 302, 308):
-                logger.warning("Internshala redirect on page %s", page)
                 break
 
             cards = parse_listing_html(resp.text, self._mode)
@@ -90,6 +89,23 @@ class InternshalaScraper(Scraper):
             time.sleep(random.uniform(0.5, 2.5))
 
         return JobResponse(jobs=jobs)
+
+    def _build_search_url(self, search_term: str | None) -> str:
+        """Build a path-based Internshala search URL.
+
+        Internshala uses path segments rather than query params for keyword search.
+        Example: /jobs/python-developer-jobs or /internships/machine-learning-internship
+
+        Args:
+            search_term: Raw search string from ScraperInput.
+
+        Returns:
+            Full URL string; falls back to base endpoint if no search term.
+        """
+        if not search_term:
+            return self._endpoint + "/"
+        slug = search_term.strip().lower().replace(" ", "-")
+        return f"{self._endpoint}/{slug}-{self._search_suffix}"
 
     def _get_with_retry(
         self, session: Any, url: str, headers: dict, params: dict | None = None

@@ -13,6 +13,7 @@ class InternshalaJobsScraper(InternshalaScraper):
     _endpoint = JOBS_URL
     _mode = "jobs"
     _site = Site.INTERNSHALA_JOBS
+    _search_suffix = "jobs"
 
 
 class InternshalaInternshipsScraper(InternshalaScraper):
@@ -21,3 +22,4 @@ class InternshalaInternshipsScraper(InternshalaScraper):
     _endpoint = INTERNSHIPS_URL
     _mode = "internships"
     _site = Site.INTERNSHALA_INTERNSHIPS
+    _search_suffix = "internship"

@@ -24,10 +24,12 @@ INTERNSHALA_HEADERS: dict[str, str] = {
 
 # Maps Internshala job type strings to JobType enum.
 # "Work From Home" sets is_remote=True on JobPost separately — mapped to FULL_TIME here.
+# "Job" and "Internship" come from the card's employment_type attribute (capitalized).
 JOB_TYPE_MAP: dict[str, JobType] = {
     "Full Time": JobType.FULL_TIME,
     "Part Time": JobType.PART_TIME,
     "Work From Home": JobType.FULL_TIME,
     "Freelance": JobType.CONTRACT,
     "Internship": JobType.INTERNSHIP,
+    "Job": JobType.FULL_TIME,
 }

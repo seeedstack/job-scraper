@@ -108,19 +108,16 @@ from jobscraper.internshala.util import parse_listing_html
 
 JOBS_HTML = """
 <html><body>
-<div class="individual_internship">
-  <div class="profile">
-    <a href="/job/detail/123456/python-developer-job">Python Developer</a>
-  </div>
-  <div class="company_name">
-    <a href="/company/acme">Acme Corp</a>
-  </div>
-  <div class="location_link">
-    <a class="location_names">Bangalore, Karnataka</a>
-  </div>
-  <div class="salary-stipend">&#8377; 5 - 8 LPA</div>
-  <div class="job-internship-type">
-    <span>Full Time</span>
+<div class="individual_internship" internshipid="123456" employment_type="job"
+     data-href="/job/detail/123456/python-developer-job">
+  <h2 class="job-internship-name">
+    <a class="job-title-href" href="/job/detail/123456/python-developer-job">Python Developer</a>
+  </h2>
+  <p class="company-name">Acme Corp</p>
+  <p class="row-1-item locations"><span><a>Bangalore, Karnataka</a></span></p>
+  <div class="row-1-item">
+    <span class="desktop">&#8377; 5 - 8 LPA</span>
+    <span class="mobile">&#8377; 5 - 8 LPA</span>
   </div>
 </div>
 </body></html>
@@ -128,25 +125,18 @@ JOBS_HTML = """
 
 INTERNSHIPS_HTML = """
 <html><body>
-<div class="individual_internship">
-  <div class="profile">
-    <a href="/internship/detail/789/ml-intern">ML Intern</a>
+<div class="individual_internship" internshipid="789" employment_type="internship"
+     data-href="/internship/detail/789/ml-intern">
+  <h2 class="job-internship-name">
+    <a class="job-title-href" href="/internship/detail/789/ml-intern">ML Intern</a>
+  </h2>
+  <p class="company-name">Startup XYZ</p>
+  <div class="row-1-item locations"><span><a>Work from Home</a></span></div>
+  <div class="row-1-item">
+    <span class="stipend">&#8377; 10,000 /month</span>
   </div>
-  <div class="company_name">
-    <a href="/company/startup">Startup XYZ</a>
-  </div>
-  <div class="location_link">
-    <a class="location_names">Work from Home</a>
-  </div>
-  <div class="salary-stipend">&#8377; 10,000 /month</div>
-  <div class="internship_other_details_container">
-    <div class="other_detail_item">
-      <span class="detail_type">Duration</span>
-      <span class="detail_value">3 Months</span>
-    </div>
-  </div>
-  <div class="job-internship-type">
-    <span>Internship</span>
+  <div class="row-1-item">
+    <span>3 Months</span>
   </div>
 </div>
 </body></html>
@@ -163,7 +153,7 @@ def test_parse_listing_html_jobs_mode():
     assert c["company"] == "Acme Corp"
     assert c["location"] == "Bangalore, Karnataka"
     assert c["salary_raw"] == "₹ 5 - 8 LPA"
-    assert c["job_type_raw"] == "Full Time"
+    assert c["job_type_raw"] == "Job"
     assert c["duration"] is None
     assert "internshala.com/job/detail/123456" in c["job_url"]
 
@@ -213,12 +203,17 @@ def _make_scraper_input(site: Site, **kwargs) -> ScraperInput:
 
 JOBS_PAGE_HTML = """
 <html><body>
-<div class="individual_internship">
-  <div class="profile"><a href="/job/detail/111/python-dev">Python Dev</a></div>
-  <div class="company_name"><a>Acme</a></div>
-  <div class="location_link"><a class="location_names">Bangalore, Karnataka</a></div>
-  <div class="salary-stipend">&#8377; 5 - 8 LPA</div>
-  <div class="job-internship-type"><span>Full Time</span></div>
+<div class="individual_internship" internshipid="111" employment_type="job"
+     data-href="/job/detail/111/python-dev">
+  <h2 class="job-internship-name">
+    <a class="job-title-href" href="/job/detail/111/python-dev">Python Dev</a>
+  </h2>
+  <p class="company-name">Acme</p>
+  <p class="row-1-item locations"><span><a>Bangalore, Karnataka</a></span></p>
+  <div class="row-1-item">
+    <span class="desktop">&#8377; 5 - 8 LPA</span>
+    <span class="mobile">&#8377; 5 - 8 LPA</span>
+  </div>
 </div>
 </body></html>
 """
@@ -227,18 +222,19 @@ EMPTY_PAGE_HTML = "<html><body></body></html>"
 
 INTERNSHIPS_PAGE_HTML = """
 <html><body>
-<div class="individual_internship">
-  <div class="profile"><a href="/internship/detail/222/ml-intern">ML Intern</a></div>
-  <div class="company_name"><a>Startup</a></div>
-  <div class="location_link"><a class="location_names">Work from Home</a></div>
-  <div class="salary-stipend">&#8377; 10,000 /month</div>
-  <div class="internship_other_details_container">
-    <div class="other_detail_item">
-      <span class="detail_type">Duration</span>
-      <span class="detail_value">3 Months</span>
-    </div>
+<div class="individual_internship" internshipid="222" employment_type="internship"
+     data-href="/internship/detail/222/ml-intern">
+  <h2 class="job-internship-name">
+    <a class="job-title-href" href="/internship/detail/222/ml-intern">ML Intern</a>
+  </h2>
+  <p class="company-name">Startup</p>
+  <div class="row-1-item locations"><span><a>Work from Home</a></span></div>
+  <div class="row-1-item">
+    <span class="stipend">&#8377; 10,000 /month</span>
   </div>
-  <div class="job-internship-type"><span>Internship</span></div>
+  <div class="row-1-item">
+    <span>3 Months</span>
+  </div>
 </div>
 </body></html>
 """

@@ -12,6 +12,7 @@ from jobscraper.model import JobPost, JobResponse, JobType, Scraper, ScraperInpu
 from jobscraper.upwork.constant import (
     API_JOB_URL,
     BASE_URL,
+    BOT_CHECK_SIGNATURES,
     SEARCH_URL,
     UPWORK_API_HEADERS,
     UPWORK_HEADERS,
@@ -125,6 +126,13 @@ class UpworkScraper(Scraper):
             try:
                 resp = session.get(url, headers=headers, params=params)
                 if resp.status_code in (429, 403):
+                    # Detect Cloudflare / bot-check pages — no point retrying
+                    body = resp.text
+                    if any(sig in body for sig in BOT_CHECK_SIGNATURES):
+                        raise UpworkException(
+                            "Bot check detected (Cloudflare challenge). "
+                            "Use proxies or an upwork_token to bypass."
+                        )
                     wait = _BACKOFF_BASE ** (attempt + 1)
                     logger.warning("HTTP %s from Upwork; retrying in %ss", resp.status_code, wait)
                     time.sleep(wait)
