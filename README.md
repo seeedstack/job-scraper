@@ -31,11 +31,22 @@ No API keys. No accounts. Chrome 120 TLS fingerprinting keeps requests looking l
 
 ## Installation
 
+**Requirements:** Python 3.13+
+
+### With pip
+
 ```bash
-pip install python-job-scraper
+pip install python-job-scraper                  # runtime only
 ```
 
-**Requirements:** Python 3.13+
+### From source
+
+```bash
+git clone https://github.com/seeedstack/job-scraper.git
+cd job-scraper
+
+pip install .                          # runtime only
+```
 
 ---
 
