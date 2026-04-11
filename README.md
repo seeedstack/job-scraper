@@ -36,8 +36,13 @@ No API keys. No accounts. Chrome 120 TLS fingerprinting keeps requests looking l
 ### With pip
 
 ```bash
-pip install python-job-scraper                  # runtime only
+pip install python-job-scraper
 ```
+
+### With uv
+```bash
+uv pip install python-job-scraper
+``` 
 
 ### From source
 
@@ -45,7 +50,7 @@ pip install python-job-scraper                  # runtime only
 git clone https://github.com/seeedstack/job-scraper.git
 cd job-scraper
 
-pip install .                          # runtime only
+pip install .
 ```
 
 ---
