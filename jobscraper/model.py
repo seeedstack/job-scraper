@@ -20,11 +20,12 @@ class Site(str, Enum):
     INDEED = "indeed"
     GLASSDOOR = "glassdoor"
     LINKEDIN = "linkedin"
-    # NAUKRI = "naukri"           # planned
+    UPWORK = "upwork"
+    INTERNSHALA_JOBS = "internshala_jobs"
+    INTERNSHALA_INTERNSHIPS = "internshala_internships"
+    NAUKRI = "naukri"
     # FOUNDIT = "foundit"         # planned
     # SHINE = "shine"             # planned
-    # INTERNSHALA = "internshala" # planned
-    # UPWORK = "upwork"           # planned
     # APNA = "apna"               # planned
 
 
